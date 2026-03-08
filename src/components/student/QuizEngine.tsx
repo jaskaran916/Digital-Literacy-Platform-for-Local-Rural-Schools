@@ -20,6 +20,24 @@ const codingQuestions: Question[] = [
     text: 'If you want the robot to face right, which block do you use?',
     options: ['Move Forward', 'Turn Left', 'Turn Right', 'Jump'],
     correctIndex: 2
+  },
+  {
+    id: 'c3',
+    text: 'What is a sequence in coding?',
+    options: ['A random order of steps', 'A list of steps in a specific order', 'A type of robot', 'A secret password'],
+    correctIndex: 1
+  },
+  {
+    id: 'c4',
+    text: 'Which block would you use to turn the robot to face the opposite direction of "Turn Right"?',
+    options: ['Move Forward', 'Turn Left', 'Jump', 'Wait'],
+    correctIndex: 1
+  },
+  {
+    id: 'c5',
+    text: 'What happens if you put a "Move Forward" block after a "Turn Right" block?',
+    options: ['The robot moves up', 'The robot moves down', 'The robot moves left', 'The robot moves right'],
+    correctIndex: 1
   }
 ];
 
@@ -35,6 +53,24 @@ const safetyQuestions: Question[] = [
     text: 'Which of these is a strong password?',
     options: ['password123', '123456', 'MyDogName', 'B!u3B3rry$99'],
     correctIndex: 3
+  },
+  {
+    id: 's3',
+    text: 'What is "Phishing"?',
+    options: ['A way to catch fish', 'A trick to steal your private information', 'A type of computer game', 'A way to make your computer faster'],
+    correctIndex: 1
+  },
+  {
+    id: 's4',
+    text: 'Is it safe to share your home address with someone you just met online?',
+    options: ['Yes, it is friendly', 'Only if they ask nicely', 'No, keep your private info secret', 'Yes, if they have a nice avatar'],
+    correctIndex: 2
+  },
+  {
+    id: 's5',
+    text: 'What should you do if someone is being mean to you in an online game?',
+    options: ['Be mean back', 'Ignore it and keep playing', 'Block them and tell a parent or teacher', 'Give them your password'],
+    correctIndex: 2
   }
 ];
 

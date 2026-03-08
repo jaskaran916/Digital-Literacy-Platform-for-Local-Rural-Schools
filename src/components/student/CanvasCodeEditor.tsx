@@ -1,7 +1,20 @@
-import { useEffect, useRef, useState } from 'react';
-import { Play, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useParams } from 'react-router-dom';
+import { Play, RotateCcw, Trash2, Plus, Trophy, AlertCircle } from 'lucide-react';
 
-interface Block {
+interface BlockType {
+  type: string;
+  color: string;
+  text: string;
+}
+
+const TOOLBOX_BLOCKS: BlockType[] = [
+  { type: 'move', color: '#3b82f6', text: 'Move Forward' },
+  { type: 'turnR', color: '#8b5cf6', text: 'Turn Right' },
+  { type: 'turnL', color: '#ec4899', text: 'Turn Left' },
+];
+
+interface WorkspaceBlock {
   id: string;
   type: string;
   x: number;
@@ -12,27 +25,145 @@ interface Block {
   text: string;
   isDragging: boolean;
   connectedTo: string | null;
+  isExecuting?: boolean;
 }
 
+interface LevelConfig {
+  target: { x: number, y: number };
+  obstacles: { x: number, y: number }[];
+  start: { x: number, y: number };
+}
+
+const LEVELS: Record<string, LevelConfig> = {
+  'coding-1': { target: { x: 4, y: 0 }, obstacles: [], start: { x: 0, y: 4 } },
+  'coding-2': { target: { x: 2, y: 2 }, obstacles: [], start: { x: 0, y: 4 } },
+  'coding-3': { 
+    target: { x: 4, y: 4 }, 
+    obstacles: [{ x: 1, y: 4 }, { x: 1, y: 3 }, { x: 1, y: 2 }, { x: 3, y: 0 }, { x: 3, y: 1 }, { x: 3, y: 2 }], 
+    start: { x: 0, y: 4 } 
+  },
+  'coding-4': { target: { x: 4, y: 0 }, obstacles: [{ x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 1 }], start: { x: 0, y: 4 } },
+  'coding-5': { target: { x: 4, y: 0 }, obstacles: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 3 }], start: { x: 0, y: 4 } },
+  'coding-6': { target: { x: 4, y: 0 }, obstacles: [{ x: 0, y: 1 }, { x: 1, y: 1 }, { x: 2, y: 1 }, { x: 3, y: 1 }, { x: 4, y: 1 }], start: { x: 0, y: 4 } },
+  'coding-7': { target: { x: 4, y: 4 }, obstacles: [{ x: 2, y: 0 }, { x: 2, y: 1 }, { x: 2, y: 2 }, { x: 2, y: 3 }, { x: 2, y: 4 }], start: { x: 0, y: 0 } },
+  'coding-8': { target: { x: 2, y: 2 }, obstacles: [{ x: 1, y: 1 }, { x: 3, y: 1 }, { x: 1, y: 3 }, { x: 3, y: 3 }], start: { x: 0, y: 0 } },
+  'default': { target: { x: 4, y: 0 }, obstacles: [], start: { x: 0, y: 4 } }
+};
+
+// Helper for cross-browser roundRect support
+const drawRoundRect = (ctx: CanvasRenderingContext2D, x: number, y: number, width: number, height: number, radius: number) => {
+  if (ctx.roundRect) {
+    ctx.roundRect(x, y, width, height, radius);
+  } else {
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+  }
+};
+
 export default function CanvasCodeEditor({ onComplete }: { onComplete: () => void }) {
+  const { moduleId } = useParams();
+  const level = LEVELS[moduleId as string] || LEVELS.default;
+  
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [blocks, setBlocks] = useState<Block[]>([
-    { id: 'start', type: 'event', x: 50, y: 50, width: 120, height: 40, color: '#f59e0b', text: 'When Run', isDragging: false, connectedTo: null },
-    { id: 'move1', type: 'action', x: 250, y: 50, width: 120, height: 40, color: '#3b82f6', text: 'Move Forward', isDragging: false, connectedTo: null },
-    { id: 'turn1', type: 'action', x: 250, y: 120, width: 120, height: 40, color: '#3b82f6', text: 'Turn Right', isDragging: false, connectedTo: null },
+  const [workspaceBlocks, setWorkspaceBlocks] = useState<WorkspaceBlock[]>([
+    { id: 'start', type: 'event', x: 50, y: 50, width: 140, height: 48, color: '#f59e0b', text: 'When Run', isDragging: false, connectedTo: null },
   ]);
   
-  const [robotPos, setRobotPos] = useState({ x: 0, y: 0, dir: 0 }); // dir: 0=right, 1=down, 2=left, 3=up
+  const [robotPos, setRobotPos] = useState({ ...level.start, dir: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Canvas drawing logic
-  useEffect(() => {
+  const getChain = useCallback((startId: string, allBlocks: WorkspaceBlock[]) => {
+    const chain = [startId];
+    let currentId = startId;
+    while (true) {
+      const next = allBlocks.find(b => b.connectedTo === currentId);
+      if (next) {
+        chain.push(next.id);
+        currentId = next.id;
+      } else {
+        break;
+      }
+    }
+    return chain;
+  }, []);
+
+  const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Handle resize
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw grid
+    ctx.strokeStyle = '#1e293b';
+    ctx.lineWidth = 1;
+    for(let i = 0; i < canvas.width; i += 40) {
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
+    }
+    for(let i = 0; i < canvas.height; i += 40) {
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
+    }
+
+    workspaceBlocks.forEach(b => {
+      ctx.save();
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath();
+      drawRoundRect(ctx, b.x + 4, b.y + 4, b.width, b.height, 12);
+      ctx.fill();
+
+      // Block body
+      ctx.fillStyle = b.color;
+      ctx.beginPath();
+      drawRoundRect(ctx, b.x, b.y, b.width, b.height, 12);
+      ctx.fill();
+
+      if (b.isExecuting) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+      }
+
+      if (b.type !== 'event') {
+        ctx.beginPath();
+        ctx.arc(b.x + 30, b.y, 12, 0, Math.PI, false);
+        ctx.fillStyle = '#0f172a';
+        ctx.fill();
+      }
+
+      ctx.beginPath();
+      ctx.arc(b.x + 30, b.y + b.height, 12, 0, Math.PI, false);
+      ctx.fillStyle = b.color;
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 16px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(b.text, b.x + b.width / 2, b.y + b.height / 2);
+      
+      if (b.isDragging) {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+  }, [workspaceBlocks]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
     const resize = () => {
       canvas.width = canvas.parentElement?.clientWidth || 800;
       canvas.height = canvas.parentElement?.clientHeight || 600;
@@ -40,94 +171,31 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
     };
     window.addEventListener('resize', resize);
     resize();
-
-    function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
-      // Draw grid
-      ctx.strokeStyle = '#334155';
-      ctx.lineWidth = 1;
-      for(let i = 0; i < canvas.width; i += 40) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, canvas.height); ctx.stroke();
-      }
-      for(let i = 0; i < canvas.height; i += 40) {
-        ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
-      }
-
-      // Draw blocks
-      blocks.forEach(b => {
-        // Shadow
-        ctx.fillStyle = 'rgba(0,0,0,0.2)';
-        ctx.beginPath();
-        ctx.roundRect(b.x + 4, b.y + 4, b.width, b.height, 8);
-        ctx.fill();
-
-        // Block body
-        ctx.fillStyle = b.color;
-        ctx.beginPath();
-        ctx.roundRect(b.x, b.y, b.width, b.height, 8);
-        ctx.fill();
-
-        // Notch (top)
-        if (b.type !== 'event') {
-          ctx.beginPath();
-          ctx.arc(b.x + 20, b.y, 8, 0, Math.PI, false);
-          ctx.fillStyle = '#1e293b'; // Background color to simulate cutout
-          ctx.fill();
-        }
-
-        // Bump (bottom)
-        ctx.beginPath();
-        ctx.arc(b.x + 20, b.y + b.height, 8, 0, Math.PI, false);
-        ctx.fillStyle = b.color;
-        ctx.fill();
-
-        // Text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 14px Inter, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(b.text, b.x + b.width / 2, b.y + b.height / 2);
-        
-        // Highlight if dragging
-        if (b.isDragging) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2;
-          ctx.stroke();
-        }
-      });
-    }
-
-    draw();
     return () => window.removeEventListener('resize', resize);
-  }, [blocks]);
+  }, [draw]);
 
-  // Interaction logic
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
     let isDragging = false;
-    let dragTargetId: string | null = null;
-    let startX = 0;
-    let startY = 0;
+    let dragChainIds: string[] = [];
+    let offset = { x: 0, y: 0 };
 
     const handleMouseDown = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      // Find clicked block (reverse order for z-index)
-      for (let i = blocks.length - 1; i >= 0; i--) {
-        const b = blocks[i];
+      for (let i = workspaceBlocks.length - 1; i >= 0; i--) {
+        const b = workspaceBlocks[i];
         if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
           isDragging = true;
-          dragTargetId = b.id;
-          startX = x - b.x;
-          startY = y - b.y;
+          dragChainIds = getChain(b.id, workspaceBlocks);
+          offset = { x: x - b.x, y: y - b.y };
           
-          setBlocks(prev => prev.map(block => 
-            block.id === b.id ? { ...block, isDragging: true } : block
+          setWorkspaceBlocks(prev => prev.map(block => 
+            dragChainIds.includes(block.id) ? { ...block, isDragging: true, connectedTo: block.id === b.id ? null : block.connectedTo } : block
           ));
           break;
         }
@@ -135,165 +203,225 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
     };
 
     const handleMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !dragTargetId) return;
-      
+      if (!isDragging || dragChainIds.length === 0) return;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      setBlocks(prev => prev.map(b => {
-        if (b.id === dragTargetId) {
-          return { ...b, x: x - startX, y: y - startY };
-        }
-        return b;
-      }));
+      setWorkspaceBlocks(prev => {
+        const target = prev.find(b => b.id === dragChainIds[0]);
+        if (!target) return prev;
+        const dx = (x - offset.x) - target.x;
+        const dy = (y - offset.y) - target.y;
+        return prev.map(b => dragChainIds.includes(b.id) ? { ...b, x: b.x + dx, y: b.y + dy } : b);
+      });
     };
 
-    const handleMouseUp = () => {
-      if (!isDragging) return;
-      isDragging = false;
-      
-      setBlocks(prev => {
-        const newBlocks = [...prev];
-        const target = newBlocks.find(b => b.id === dragTargetId);
-        if (!target) return prev;
-        
-        target.isDragging = false;
+    const handleMouseUp = (e: MouseEvent) => {
+      if (!isDragging || dragChainIds.length === 0) return;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
 
-        // Snap logic
-        if (target.type !== 'event') {
-          target.connectedTo = null;
+      setWorkspaceBlocks(prev => {
+        const targetId = dragChainIds[0];
+        const target = prev.find(b => b.id === targetId);
+        if (!target) return prev;
+
+        if (x < 0 || y < 0 || x > canvas.width || y > canvas.height) {
+           if (target.id !== 'start') return prev.filter(b => !dragChainIds.includes(b.id));
+        }
+
+        let newBlocks = prev.map(b => dragChainIds.includes(b.id) ? { ...b, isDragging: false } : b);
+        const updatedTarget = newBlocks.find(b => b.id === targetId)!;
+
+        if (updatedTarget.type !== 'event') {
           for (const other of newBlocks) {
-            if (other.id !== target.id) {
-              // Check if target is close to the bottom of 'other'
+            if (!dragChainIds.includes(other.id)) {
               const snapX = other.x;
               const snapY = other.y + other.height;
-              
-              if (Math.abs(target.x - snapX) < 30 && Math.abs(target.y - snapY) < 30) {
-                target.x = snapX;
-                target.y = snapY;
-                target.connectedTo = other.id;
+              if (Math.abs(updatedTarget.x - snapX) < 40 && Math.abs(updatedTarget.y - snapY) < 40) {
+                const dx = snapX - updatedTarget.x;
+                const dy = snapY - updatedTarget.y;
+                newBlocks = newBlocks.map(b => dragChainIds.includes(b.id) ? { ...b, x: b.x + dx, y: b.y + dy, connectedTo: b.id === targetId ? other.id : b.connectedTo } : b);
                 break;
               }
             }
           }
         }
-        
         return newBlocks;
       });
-      
-      dragTargetId = null;
+      isDragging = false;
+      dragChainIds = [];
     };
 
     canvas.addEventListener('mousedown', handleMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
-
     return () => {
       canvas.removeEventListener('mousedown', handleMouseDown);
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [blocks]);
+  }, [workspaceBlocks, getChain]);
 
-  const handleRun = () => {
+  const handleRun = async () => {
+    if (isPlaying) return;
     setIsPlaying(true);
-    // Simple interpreter
+    setError(null);
+    setRobotPos({ ...level.start, dir: 0 });
+
+    const sequence: { id: string, text: string }[] = [];
     let currentId: string | null = 'start';
-    const sequence: string[] = [];
-    
-    // Find sequence
-    while(currentId) {
-      const next = blocks.find(b => b.connectedTo === currentId);
+    while (currentId) {
+      const next = workspaceBlocks.find(b => b.connectedTo === currentId);
       if (next) {
-        sequence.push(next.id);
+        sequence.push({ id: next.id, text: next.text });
         currentId = next.id;
       } else {
         currentId = null;
       }
     }
 
-    // Execute sequence (mock animation)
-    let step = 0;
-    const interval = setInterval(() => {
-      if (step >= sequence.length) {
-        clearInterval(interval);
-        setIsPlaying(false);
-        // If sequence is correct (mock condition), complete
-        if (sequence.length >= 2) {
-          setTimeout(() => onComplete(), 1000);
+    if (sequence.length === 0) {
+      setIsPlaying(false);
+      return;
+    }
+
+    for (const step of sequence) {
+      setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: b.id === step.id })));
+      await new Promise(resolve => setTimeout(resolve, 600));
+
+      let hitObstacle = false;
+      setRobotPos(p => {
+        let nx = p.x;
+        let ny = p.y;
+        let ndir = p.dir;
+
+        if (step.text === 'Move Forward') {
+          if (p.dir === 0) nx = Math.min(4, nx + 1);
+          else if (p.dir === 1) ny = Math.min(4, ny + 1);
+          else if (p.dir === 2) nx = Math.max(0, nx - 1);
+          else if (p.dir === 3) ny = Math.max(0, ny - 1);
+        } else if (step.text === 'Turn Right') {
+          ndir = (p.dir + 1) % 4;
+        } else if (step.text === 'Turn Left') {
+          ndir = (p.dir + 3) % 4;
         }
-        return;
+
+        if (level.obstacles.some(o => o.x === nx && o.y === ny)) {
+          hitObstacle = true;
+          return p;
+        }
+        return { x: nx, y: ny, dir: ndir };
+      });
+
+      if (hitObstacle) {
+        setError("Ouch! You hit an obstacle!");
+        break;
       }
-      
-      const action = blocks.find(b => b.id === sequence[step])?.text;
-      if (action === 'Move Forward') {
-        setRobotPos(p => ({ ...p, x: p.x + 1 }));
-      } else if (action === 'Turn Right') {
-        setRobotPos(p => ({ ...p, dir: (p.dir + 1) % 4 }));
+    }
+
+    setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: false })));
+    setIsPlaying(false);
+
+    setRobotPos(finalPos => {
+      if (finalPos.x === level.target.x && finalPos.y === level.target.y) {
+        setShowSuccess(true);
+      } else if (!error) {
+        setError("Not quite there yet! Try again.");
       }
-      
-      step++;
-    }, 500);
+      return finalPos;
+    });
   };
 
   const handleReset = () => {
-    setRobotPos({ x: 0, y: 0, dir: 0 });
+    setRobotPos({ ...level.start, dir: 0 });
+    setIsPlaying(false);
+    setShowSuccess(false);
+    setError(null);
+    setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: false })));
   };
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row h-full">
-      {/* Simulation View */}
-      <div className="w-full md:w-1/3 bg-slate-800 border-r border-slate-700 flex flex-col">
-        <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
-          <h3 className="font-semibold text-slate-300">Simulation</h3>
-          <div className="flex gap-2">
-            <button onClick={handleReset} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors">
-              <RotateCcw size={18} />
-            </button>
-            <button 
-              onClick={handleRun} 
-              disabled={isPlaying}
-              className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Play size={18} />
-              Run
-            </button>
+    <div className="flex-1 flex flex-col md:flex-row h-full bg-slate-900 overflow-hidden relative">
+      {showSuccess && (
+        <div className="absolute inset-0 z-50 bg-slate-900/90 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center animate-in fade-in zoom-in duration-300">
+          <div className="w-24 h-24 bg-emerald-500 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-emerald-500/20">
+            <Trophy size={48} className="text-white" />
           </div>
+          <h2 className="text-4xl font-bold text-white mb-4">Mission Accomplished!</h2>
+          <p className="text-xl text-slate-400 mb-8 max-w-md">Great job! You navigated the robot to the target using your code.</p>
+          <button onClick={onComplete} className="px-10 py-4 bg-emerald-500 hover:bg-emerald-600 text-white text-xl font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95">Continue to Next Step</button>
         </div>
-        <div className="flex-1 relative bg-slate-800 flex items-center justify-center p-8">
-          {/* Mock Grid for Robot */}
-          <div className="w-full aspect-square max-w-sm bg-slate-700 rounded-xl border-2 border-slate-600 grid grid-cols-5 grid-rows-5 relative overflow-hidden">
-             {/* Target */}
-             <div className="absolute right-4 top-4 w-12 h-12 bg-rose-500/20 border-2 border-rose-500 rounded-full flex items-center justify-center animate-pulse">
-                <div className="w-4 h-4 bg-rose-500 rounded-full" />
-             </div>
-             
-             {/* Robot */}
-             <div 
-                className="absolute w-12 h-12 bg-blue-500 rounded-xl border-2 border-blue-400 flex items-center justify-center shadow-lg transition-all duration-500"
-                style={{ 
-                  left: `${robotPos.x * 20 + 10}%`, 
-                  top: `${robotPos.y * 20 + 10}%`,
-                  transform: `rotate(${robotPos.dir * 90}deg)`
-                }}
-             >
-                <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[12px] border-b-white rotate-90 ml-2" />
-             </div>
-          </div>
+      )}
+
+      <div className="w-full md:w-64 bg-slate-800 border-r border-slate-700 flex flex-col p-4 space-y-4">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Toolbox</h3>
+        <div className="space-y-3">
+          {TOOLBOX_BLOCKS.map((tb, i) => (
+            <button key={i} onClick={() => addFromToolbox(tb)} className="w-full p-4 rounded-xl flex items-center justify-between group transition-all hover:scale-105 active:scale-95 shadow-lg" style={{ backgroundColor: tb.color }}>
+              <span className="font-bold text-white">{tb.text}</span>
+              <Plus size={20} className="text-white/50 group-hover:text-white" />
+            </button>
+          ))}
+        </div>
+        <div className="mt-auto pt-8">
+           <div className="p-6 border-2 border-dashed border-slate-700 rounded-2xl flex flex-col items-center justify-center text-slate-500 gap-2">
+              <Trash2 size={32} />
+              <span className="text-xs font-medium">Drag here to delete</span>
+           </div>
         </div>
       </div>
 
-      {/* Canvas Workspace */}
-      <div className="flex-1 relative bg-slate-900 overflow-hidden">
-        <div className="absolute top-4 left-4 z-10 bg-slate-800/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-sm text-slate-400">
-          Drag blocks to connect them. Attach actions to the "When Run" block.
+      <div className="w-full md:w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+          <h3 className="font-semibold text-slate-300">Simulation</h3>
+          <div className="flex gap-2">
+            <button onClick={handleReset} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"><RotateCcw size={18} /></button>
+            <button onClick={handleRun} disabled={isPlaying} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"><Play size={18} />Run</button>
+          </div>
         </div>
-        <canvas 
-          ref={canvasRef} 
-          className="w-full h-full cursor-grab active:cursor-grabbing"
-        />
+        
+        <div className="flex-1 relative bg-slate-800 flex items-center justify-center p-6">
+          <div className="w-full aspect-square max-w-[280px] bg-slate-700 rounded-2xl border-4 border-slate-600 grid grid-cols-5 grid-rows-5 relative overflow-hidden shadow-inner">
+             <div className="absolute w-12 h-12 bg-rose-500/20 border-2 border-rose-500 rounded-full flex items-center justify-center animate-pulse z-0" style={{ left: `${level.target.x * 20 + 2}%`, top: `${level.target.y * 20 + 2}%` }}>
+                <div className="w-6 h-6 bg-rose-500 rounded-full shadow-[0_0_15px_rgba(244,63,94,0.6)]" />
+             </div>
+             
+             {level.obstacles.map((o, i) => (
+               <div key={i} className="absolute w-12 h-12 bg-slate-900 border-2 border-slate-800 rounded-lg flex items-center justify-center z-0" style={{ left: `${o.x * 20 + 2}%`, top: `${o.y * 20 + 2}%` }}>
+                 <AlertCircle size={20} className="text-slate-700" />
+               </div>
+             ))}
+
+             <div className="absolute w-12 h-12 bg-blue-500 rounded-xl border-2 border-blue-400 flex items-center justify-center shadow-lg transition-all duration-500 z-10" style={{ left: `${robotPos.x * 20 + 2}%`, top: `${robotPos.y * 20 + 2}%`, transform: `rotate(${robotPos.dir * 90}deg)` }}>
+                <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-b-[14px] border-b-white rotate-90 ml-2" />
+             </div>
+
+             <div className="absolute inset-0 grid grid-cols-5 grid-rows-5 pointer-events-none">
+                {Array.from({ length: 25 }).map((_, i) => <div key={i} className="border border-slate-600/30" />)}
+             </div>
+          </div>
+        </div>
+        
+        {error && (
+          <div className="p-4 bg-rose-500/20 text-rose-400 text-sm text-center font-medium animate-bounce">
+            {error}
+          </div>
+        )}
+        <div className="p-4 bg-slate-900/30 text-xs text-slate-500 text-center italic">Goal: Reach the red target!</div>
+      </div>
+
+      <div className="flex-1 relative bg-slate-900">
+        <canvas ref={canvasRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+        <div className="absolute bottom-4 right-4 bg-slate-800/80 backdrop-blur px-4 py-2 rounded-lg border border-slate-700 text-[10px] text-slate-500 uppercase tracking-widest font-bold">Workspace</div>
       </div>
     </div>
   );
+
+  function addFromToolbox(type: BlockType) {
+    const newId = `block-${Date.now()}`;
+    setWorkspaceBlocks(prev => [...prev, { id: newId, type: type.type, x: 250, y: 100 + (prev.length * 10), width: 140, height: 48, color: type.color, text: type.text, isDragging: false, connectedTo: null }]);
+  }
 }
