@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, Module, User } from '../../db/db';
-import { ArrowLeft, Play, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Play, CheckCircle2, Video } from 'lucide-react';
 import CanvasCodeEditor from '../../components/student/CanvasCodeEditor';
 import QuizEngine from '../../components/student/QuizEngine';
+import VideoTutorialModal from '../../components/student/VideoTutorialModal';
 
 export default function LearningEnvironment() {
   const { moduleId } = useParams();
@@ -13,6 +14,7 @@ export default function LearningEnvironment() {
   const [module, setModule] = useState<Module | null>(null);
   const [stage, setStage] = useState<'pre-test' | 'learning' | 'post-test' | 'completed'>('pre-test');
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
   
   const assessment = useLiveQuery(() => 
     db.assessments.where({ user_id: user?.id || 0, module_id: moduleId || '' }).first(), 
@@ -112,9 +114,18 @@ export default function LearningEnvironment() {
           <h1 className="text-xl font-bold text-white">{module.title}</h1>
         </div>
         
-        <div className="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full text-sm font-medium">
-          <span className="text-slate-400">Stage:</span>
-          <span className="text-emerald-400 capitalize">{stage.replace('-', ' ')}</span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setIsVideoModalOpen(true)}
+            className="flex items-center gap-2 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 px-4 py-2 rounded-xl text-sm font-bold transition-colors border border-indigo-500/30"
+          >
+            <Video size={18} />
+            <span className="hidden sm:inline">AI Tutorial</span>
+          </button>
+          <div className="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full text-sm font-medium">
+            <span className="text-slate-400">Stage:</span>
+            <span className="text-emerald-400 capitalize">{stage.replace('-', ' ')}</span>
+          </div>
         </div>
       </header>
 
@@ -195,6 +206,13 @@ export default function LearningEnvironment() {
           </div>
         )}
       </main>
+      
+      <VideoTutorialModal 
+        isOpen={isVideoModalOpen} 
+        onClose={() => setIsVideoModalOpen(false)} 
+        moduleTitle={module.title}
+        moduleType={module.type}
+      />
     </div>
   );
 }
