@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { CheckCircle2, XCircle } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { CheckCircle2, XCircle, ArrowRight, ArrowLeft } from 'lucide-react';
 
 interface Question {
   id: string;
@@ -83,33 +83,55 @@ interface QuizEngineProps {
 export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineProps) {
   const questions = moduleType === 'coding' ? codingQuestions : safetyQuestions;
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [selectedOption, setSelectedOption] = useState<number | null>(null);
-  const [isChecking, setIsChecking] = useState(false);
-  const [score, setScore] = useState(0);
+  const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const currentQuestion = questions[currentIndex];
+  const selectedOption = answers[currentIndex];
 
-  const handleCheck = () => {
-    if (selectedOption === null) return;
-    
-    setIsChecking(true);
-    
-    const isCorrect = selectedOption === currentQuestion.correctIndex;
-    if (isCorrect) {
-      setScore(s => s + 1);
+  const handleNext = useCallback(() => {
+    if (currentIndex < questions.length - 1) {
+      setCurrentIndex(i => i + 1);
     }
+  }, [currentIndex, questions.length]);
 
-    setTimeout(() => {
-      if (currentIndex < questions.length - 1) {
-        setCurrentIndex(i => i + 1);
-        setSelectedOption(null);
-        setIsChecking(false);
-      } else {
-        // Calculate final score as percentage
-        const finalScore = Math.round(((score + (isCorrect ? 1 : 0)) / questions.length) * 100);
-        onComplete(finalScore);
+  const handlePrev = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex(i => i - 1);
+    }
+  }, [currentIndex]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') {
+        handleNext();
+      } else if (e.key === 'ArrowLeft') {
+        handlePrev();
       }
-    }, 1500);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleNext, handlePrev]);
+
+  const handleOptionSelect = (index: number) => {
+    if (isSubmitted) return;
+    const newAnswers = [...answers];
+    newAnswers[currentIndex] = index;
+    setAnswers(newAnswers);
+  };
+
+  const handleSubmit = () => {
+    if (answers.some(a => a === null)) return;
+    setIsSubmitted(true);
+    let correctCount = 0;
+    answers.forEach((ans, idx) => {
+      if (ans === questions[idx].correctIndex) correctCount++;
+    });
+    const finalScore = Math.round((correctCount / questions.length) * 100);
+    
+    setTimeout(() => {
+      onComplete(finalScore);
+    }, 2000);
   };
 
   return (
@@ -120,7 +142,7 @@ export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineP
         <div className="absolute top-0 left-0 w-full h-2 bg-slate-700">
           <div 
             className="h-full bg-emerald-500 transition-all duration-500"
-            style={{ width: `${((currentIndex) / questions.length) * 100}%` }}
+            style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}
           />
         </div>
 
@@ -140,7 +162,7 @@ export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineP
             
             let btnClass = "w-full p-6 text-left text-lg md:text-xl font-medium rounded-2xl border-2 transition-all duration-300 flex items-center justify-between group ";
             
-            if (!isChecking) {
+            if (!isSubmitted) {
               btnClass += isSelected 
                 ? "bg-indigo-500/20 border-indigo-500 text-white" 
                 : "bg-slate-700/50 border-slate-600 text-slate-300 hover:bg-slate-700 hover:border-slate-500";
@@ -159,12 +181,12 @@ export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineP
             return (
               <button
                 key={index}
-                onClick={() => !isChecking && setSelectedOption(index)}
-                disabled={isChecking}
+                onClick={() => handleOptionSelect(index)}
+                disabled={isSubmitted}
                 className={btnClass}
               >
                 <span>{option}</span>
-                {isChecking && isSelected && (
+                {isSubmitted && isSelected && (
                   isCorrect ? <CheckCircle2 className="text-emerald-500" size={28} /> : <XCircle className="text-rose-500" size={28} />
                 )}
               </button>
@@ -172,18 +194,43 @@ export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineP
           })}
         </div>
 
-        <div className="mt-10 flex justify-end">
+        <div className="mt-10 flex justify-between items-center">
           <button
-            onClick={handleCheck}
-            disabled={selectedOption === null || isChecking}
-            className={`px-8 py-4 rounded-2xl font-bold text-xl transition-all ${
-              selectedOption !== null && !isChecking
-                ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20'
-                : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+            onClick={handlePrev}
+            disabled={currentIndex === 0}
+            className={`px-6 py-3 rounded-xl font-bold text-lg flex items-center gap-2 transition-all ${
+              currentIndex > 0
+                ? 'bg-slate-700 hover:bg-slate-600 text-white'
+                : 'bg-slate-800 text-slate-600 cursor-not-allowed'
             }`}
           >
-            {isChecking ? 'Checking...' : 'Check Answer'}
+            <ArrowLeft size={20} /> Move Backward
           </button>
+          
+          <div className="text-slate-400 font-medium">
+            {currentIndex + 1} / {questions.length}
+          </div>
+
+          {currentIndex < questions.length - 1 ? (
+            <button
+              onClick={handleNext}
+              className={`px-6 py-3 rounded-xl font-bold text-lg flex items-center gap-2 transition-all bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/20`}
+            >
+              Move Forward <ArrowRight size={20} />
+            </button>
+          ) : (
+            <button
+              onClick={handleSubmit}
+              disabled={answers.some(a => a === null) || isSubmitted}
+              className={`px-6 py-3 rounded-xl font-bold text-lg transition-all ${
+                !answers.some(a => a === null) && !isSubmitted
+                  ? 'bg-indigo-500 hover:bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+                  : 'bg-slate-700 text-slate-500 cursor-not-allowed'
+              }`}
+            >
+              {isSubmitted ? 'Submitted!' : 'Submit Quiz'}
+            </button>
+          )}
         </div>
 
       </div>
