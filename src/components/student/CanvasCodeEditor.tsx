@@ -240,7 +240,8 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
             if (!dragChainIds.includes(other.id)) {
               const snapX = other.x;
               const snapY = other.y + other.height;
-              if (Math.abs(updatedTarget.x - snapX) < 40 && Math.abs(updatedTarget.y - snapY) < 40) {
+              const hasChild = newBlocks.some(b => b.connectedTo === other.id && !dragChainIds.includes(b.id));
+              if (!hasChild && Math.abs(updatedTarget.x - snapX) < 40 && Math.abs(updatedTarget.y - snapY) < 40) {
                 const dx = snapX - updatedTarget.x;
                 const dy = snapY - updatedTarget.y;
                 newBlocks = newBlocks.map(b => dragChainIds.includes(b.id) ? { ...b, x: b.x + dx, y: b.y + dy, connectedTo: b.id === targetId ? other.id : b.connectedTo } : b);
@@ -269,7 +270,9 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
     if (isPlaying) return;
     setIsPlaying(true);
     setError(null);
-    setRobotPos({ ...level.start, dir: 0 });
+    
+    let currentPos = { ...level.start, dir: 0 };
+    setRobotPos(currentPos);
 
     const sequence: { id: string, text: string }[] = [];
     let currentId: string | null = 'start';
@@ -288,51 +291,53 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       return;
     }
 
+    let hitError = false;
+
     for (const step of sequence) {
       setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: b.id === step.id })));
       await new Promise(resolve => setTimeout(resolve, 600));
 
-      let hitObstacle = false;
-      setRobotPos(p => {
-        let nx = p.x;
-        let ny = p.y;
-        let ndir = p.dir;
+      let nx = currentPos.x;
+      let ny = currentPos.y;
+      let ndir = currentPos.dir;
 
-        if (step.text === 'Move Forward') {
-          if (p.dir === 0) nx = Math.min(4, nx + 1);
-          else if (p.dir === 1) ny = Math.min(4, ny + 1);
-          else if (p.dir === 2) nx = Math.max(0, nx - 1);
-          else if (p.dir === 3) ny = Math.max(0, ny - 1);
-        } else if (step.text === 'Turn Right') {
-          ndir = (p.dir + 1) % 4;
-        } else if (step.text === 'Turn Left') {
-          ndir = (p.dir + 3) % 4;
-        }
+      if (step.text === 'Move Forward') {
+        if (currentPos.dir === 0) nx += 1;
+        else if (currentPos.dir === 1) ny += 1;
+        else if (currentPos.dir === 2) nx -= 1;
+        else if (currentPos.dir === 3) ny -= 1;
+      } else if (step.text === 'Turn Right') {
+        ndir = (currentPos.dir + 1) % 4;
+      } else if (step.text === 'Turn Left') {
+        ndir = (currentPos.dir + 3) % 4;
+      }
 
-        if (level.obstacles.some(o => o.x === nx && o.y === ny)) {
-          hitObstacle = true;
-          return p;
-        }
-        return { x: nx, y: ny, dir: ndir };
-      });
-
-      if (hitObstacle) {
-        setError("Ouch! You hit an obstacle!");
+      if (nx < 0 || nx > 4 || ny < 0 || ny > 4) {
+        setError("Ouch! You hit a wall!");
+        hitError = true;
         break;
       }
+
+      if (level.obstacles.some(o => o.x === nx && o.y === ny)) {
+        setError("Ouch! You hit an obstacle!");
+        hitError = true;
+        break;
+      }
+
+      currentPos = { x: nx, y: ny, dir: ndir };
+      setRobotPos(currentPos);
     }
 
     setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: false })));
     setIsPlaying(false);
 
-    setRobotPos(finalPos => {
-      if (finalPos.x === level.target.x && finalPos.y === level.target.y) {
+    if (!hitError) {
+      if (currentPos.x === level.target.x && currentPos.y === level.target.y) {
         setShowSuccess(true);
-      } else if (!error) {
+      } else {
         setError("Not quite there yet! Try again.");
       }
-      return finalPos;
-    });
+    }
   };
 
   const handleReset = () => {
@@ -422,6 +427,6 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
 
   function addFromToolbox(type: BlockType) {
     const newId = `block-${Date.now()}`;
-    setWorkspaceBlocks(prev => [...prev, { id: newId, type: type.type, x: 250, y: 100 + (prev.length * 10), width: 140, height: 48, color: type.color, text: type.text, isDragging: false, connectedTo: null }]);
+    setWorkspaceBlocks(prev => [...prev, { id: newId, type: type.type, x: 50, y: 150 + (prev.length * 10), width: 140, height: 48, color: type.color, text: type.text, isDragging: false, connectedTo: null }]);
   }
 }
