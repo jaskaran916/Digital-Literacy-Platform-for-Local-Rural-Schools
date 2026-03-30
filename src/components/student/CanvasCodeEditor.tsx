@@ -76,6 +76,11 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
     { id: 'start', type: 'event', x: 50, y: 50, width: 140, height: 48, color: '#f59e0b', text: 'When Run', isDragging: false, connectedTo: null },
   ]);
   
+  const workspaceBlocksRef = useRef(workspaceBlocks);
+  useEffect(() => {
+    workspaceBlocksRef.current = workspaceBlocks;
+  }, [workspaceBlocks]);
+  
   const [robotPos, setRobotPos] = useState({ ...level.start, dir: 0 });
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -187,11 +192,13 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
 
-      for (let i = workspaceBlocks.length - 1; i >= 0; i--) {
-        const b = workspaceBlocks[i];
+      const currentBlocks = workspaceBlocksRef.current;
+
+      for (let i = currentBlocks.length - 1; i >= 0; i--) {
+        const b = currentBlocks[i];
         if (x >= b.x && x <= b.x + b.width && y >= b.y && y <= b.y + b.height) {
           isDragging = true;
-          dragChainIds = getChain(b.id, workspaceBlocks);
+          dragChainIds = getChain(b.id, currentBlocks);
           offset = { x: x - b.x, y: y - b.y };
           
           setWorkspaceBlocks(prev => prev.map(block => 
@@ -264,7 +271,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [workspaceBlocks, getChain]);
+  }, [getChain]);
 
   const handleRun = async () => {
     if (isPlaying) return;
