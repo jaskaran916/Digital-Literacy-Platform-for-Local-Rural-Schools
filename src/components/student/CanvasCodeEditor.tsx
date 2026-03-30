@@ -85,6 +85,18 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
   const [isPlaying, setIsPlaying] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const runIdRef = useRef(0);
+
+  useEffect(() => {
+    runIdRef.current++;
+    setRobotPos({ ...level.start, dir: 0 });
+    setIsPlaying(false);
+    setShowSuccess(false);
+    setError(null);
+    setWorkspaceBlocks([
+      { id: 'start', type: 'event', x: 50, y: 50, width: 140, height: 48, color: '#f59e0b', text: 'When Run', isDragging: false, connectedTo: null },
+    ]);
+  }, [moduleId, level.start.x, level.start.y]);
 
   const getChain = useCallback((startId: string, allBlocks: WorkspaceBlock[]) => {
     const chain = [startId];
@@ -248,7 +260,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
               const snapX = other.x;
               const snapY = other.y + other.height;
               const hasChild = newBlocks.some(b => b.connectedTo === other.id && !dragChainIds.includes(b.id));
-              if (!hasChild && Math.abs(updatedTarget.x - snapX) < 40 && Math.abs(updatedTarget.y - snapY) < 40) {
+              if (!hasChild && Math.abs(updatedTarget.x - snapX) < 100 && Math.abs(updatedTarget.y - snapY) < 80) {
                 const dx = snapX - updatedTarget.x;
                 const dy = snapY - updatedTarget.y;
                 newBlocks = newBlocks.map(b => dragChainIds.includes(b.id) ? { ...b, x: b.x + dx, y: b.y + dy, connectedTo: b.id === targetId ? other.id : b.connectedTo } : b);
@@ -277,77 +289,94 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
     if (isPlaying) return;
     setIsPlaying(true);
     setError(null);
+    setShowSuccess(false);
     
-    let currentPos = { ...level.start, dir: 0 };
-    setRobotPos(currentPos);
-
-    const sequence: { id: string, text: string }[] = [];
-    let currentId: string | null = 'start';
-    while (currentId) {
-      const next = workspaceBlocks.find(b => b.connectedTo === currentId);
-      if (next) {
-        sequence.push({ id: next.id, text: next.text });
-        currentId = next.id;
-      } else {
-        currentId = null;
-      }
-    }
-
-    if (sequence.length === 0) {
-      setIsPlaying(false);
-      return;
-    }
-
-    let hitError = false;
-
-    for (const step of sequence) {
-      setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: b.id === step.id })));
-      await new Promise(resolve => setTimeout(resolve, 600));
-
-      let nx = currentPos.x;
-      let ny = currentPos.y;
-      let ndir = currentPos.dir;
-
-      if (step.text === 'Move Forward') {
-        if (currentPos.dir === 0) nx += 1;
-        else if (currentPos.dir === 1) ny += 1;
-        else if (currentPos.dir === 2) nx -= 1;
-        else if (currentPos.dir === 3) ny -= 1;
-      } else if (step.text === 'Turn Right') {
-        ndir = (currentPos.dir + 1) % 4;
-      } else if (step.text === 'Turn Left') {
-        ndir = (currentPos.dir + 3) % 4;
-      }
-
-      if (nx < 0 || nx > 4 || ny < 0 || ny > 4) {
-        setError("Ouch! You hit a wall!");
-        hitError = true;
-        break;
-      }
-
-      if (level.obstacles.some(o => o.x === nx && o.y === ny)) {
-        setError("Ouch! You hit an obstacle!");
-        hitError = true;
-        break;
-      }
-
-      currentPos = { x: nx, y: ny, dir: ndir };
+    const currentRunId = ++runIdRef.current;
+    
+    try {
+      let currentPos = { ...level.start, dir: 0 };
       setRobotPos(currentPos);
-    }
 
-    setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: false })));
-    setIsPlaying(false);
+      const sequence: { id: string, text: string }[] = [];
+      let currentId: string | null = 'start';
+      while (currentId) {
+        const next = workspaceBlocks.find(b => b.connectedTo === currentId);
+        if (next) {
+          sequence.push({ id: next.id, text: next.text });
+          currentId = next.id;
+        } else {
+          currentId = null;
+        }
+      }
 
-    if (!hitError) {
-      if (currentPos.x === level.target.x && currentPos.y === level.target.y) {
-        setShowSuccess(true);
-      } else {
-        setError("Not quite there yet! Try again.");
+      if (sequence.length === 0) {
+        setError("Drag blocks from the Toolbox and connect them under 'When Run'!");
+        return;
+      }
+
+      let hitError = false;
+
+      for (const step of sequence) {
+        if (currentRunId !== runIdRef.current) return;
+
+        setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: b.id === step.id })));
+
+        let nx = currentPos.x;
+        let ny = currentPos.y;
+        let ndir = currentPos.dir;
+
+        if (step.text === 'Move Forward') {
+          if (currentPos.dir === 0) nx += 1;
+          else if (currentPos.dir === 1) ny += 1;
+          else if (currentPos.dir === 2) nx -= 1;
+          else if (currentPos.dir === 3) ny -= 1;
+        } else if (step.text === 'Turn Right') {
+          ndir = (currentPos.dir + 1) % 4;
+        } else if (step.text === 'Turn Left') {
+          ndir = (currentPos.dir + 3) % 4;
+        }
+
+        if (nx < 0 || nx > 4 || ny < 0 || ny > 4) {
+          setError("Ouch! You hit a wall!");
+          hitError = true;
+          break;
+        }
+
+        if (level.obstacles.some(o => o.x === nx && o.y === ny)) {
+          setError("Ouch! You hit an obstacle!");
+          hitError = true;
+          break;
+        }
+
+        currentPos = { x: nx, y: ny, dir: ndir };
+        setRobotPos(currentPos);
+        
+        await new Promise(resolve => setTimeout(resolve, 600));
+      }
+
+      if (currentRunId !== runIdRef.current) return;
+
+      setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: false })));
+
+      if (!hitError) {
+        if (currentPos.x === level.target.x && currentPos.y === level.target.y) {
+          setShowSuccess(true);
+        } else {
+          setError("Not quite there yet! Try again.");
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setError("An error occurred during simulation.");
+    } finally {
+      if (currentRunId === runIdRef.current) {
+        setIsPlaying(false);
       }
     }
   };
 
   const handleReset = () => {
+    runIdRef.current++;
     setRobotPos({ ...level.start, dir: 0 });
     setIsPlaying(false);
     setShowSuccess(false);
@@ -433,7 +462,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
   );
 
   function addFromToolbox(type: BlockType) {
-    const newId = `block-${Date.now()}`;
+    const newId = `block-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     setWorkspaceBlocks(prev => [...prev, { id: newId, type: type.type, x: 50, y: 150 + (prev.length * 10), width: 140, height: 48, color: type.color, text: type.text, isDragging: false, connectedTo: null }]);
   }
 }
