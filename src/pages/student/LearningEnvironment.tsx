@@ -12,6 +12,7 @@ export default function LearningEnvironment() {
   const [user, setUser] = useState<User | null>(null);
   const [module, setModule] = useState<Module | null>(null);
   const [stage, setStage] = useState<'pre-test' | 'learning' | 'post-test' | 'completed'>('pre-test');
+  const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   
   const assessment = useLiveQuery(() => 
     db.assessments.where({ user_id: user?.id || 0, module_id: moduleId || '' }).first(), 
@@ -132,13 +133,30 @@ export default function LearningEnvironment() {
             {module.type === 'coding' ? (
               <CanvasCodeEditor onComplete={handleLearningComplete} />
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-4xl mx-auto text-center space-y-8">
+              <div className="flex-1 flex flex-col items-center justify-center p-8 max-w-4xl mx-auto text-center space-y-8 w-full">
                 <div className="w-full aspect-video bg-slate-800 rounded-3xl border-2 border-slate-700 flex items-center justify-center relative overflow-hidden group">
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent z-10" />
-                  <Play size={64} className="text-white z-20 opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all cursor-pointer" />
-                  <p className="absolute bottom-6 left-8 z-20 text-lg font-medium text-slate-300">
-                    Video Lesson: {module.title}
-                  </p>
+                  {isPlayingVideo ? (
+                    <iframe 
+                      className="w-full h-full absolute inset-0 z-30"
+                      src={`https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1`} 
+                      title="Video Lesson" 
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                      allowFullScreen
+                    ></iframe>
+                  ) : (
+                    <>
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent z-10" />
+                      <div 
+                        className="absolute inset-0 z-20 flex items-center justify-center cursor-pointer"
+                        onClick={() => setIsPlayingVideo(true)}
+                      >
+                        <Play size={64} className="text-white opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all" />
+                      </div>
+                      <p className="absolute bottom-6 left-8 z-20 text-lg font-medium text-slate-300 pointer-events-none">
+                        Video Lesson: {module.title}
+                      </p>
+                    </>
+                  )}
                 </div>
                 <button 
                   onClick={handleLearningComplete}
