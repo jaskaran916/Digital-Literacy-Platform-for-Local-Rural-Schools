@@ -176,7 +176,43 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       }
       ctx.restore();
     });
-  }, [workspaceBlocks]);
+
+    // Draw snap highlight
+    const draggedRoot = workspaceBlocks.find(b => b.isDragging && 
+      !workspaceBlocks.some(parent => parent.id === b.connectedTo && parent.isDragging)
+    );
+
+    if (draggedRoot && draggedRoot.type !== 'event') {
+      const dragChainIds = getChain(draggedRoot.id, workspaceBlocks);
+      const validTargets = workspaceBlocks.filter(b => 
+        !dragChainIds.includes(b.id) && 
+        !workspaceBlocks.some(child => child.connectedTo === b.id && !dragChainIds.includes(child.id))
+      );
+
+      let bestTarget = null;
+      let minDistance = 40;
+
+      for (const target of validTargets) {
+        const snapX = target.x;
+        const snapY = target.y + target.height;
+        const dist = Math.hypot(draggedRoot.x - snapX, draggedRoot.y - snapY);
+
+        if (dist < minDistance) {
+          minDistance = dist;
+          bestTarget = target;
+        }
+      }
+
+      if (bestTarget) {
+        ctx.save();
+        ctx.fillStyle = 'rgba(251, 191, 36, 0.8)'; // Amber-400
+        ctx.beginPath();
+        drawRoundRect(ctx, bestTarget.x, bestTarget.y + bestTarget.height - 5, bestTarget.width, 10, 5);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }, [workspaceBlocks, getChain]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -247,26 +283,53 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
         const target = prev.find(b => b.id === targetId);
         if (!target) return prev;
 
+        // Delete block if dropped outside canvas
         if (x < 0 || y < 0 || x > canvas.width || y > canvas.height) {
-           if (target.id !== 'start') return prev.filter(b => !dragChainIds.includes(b.id));
+           if (target.id !== 'start') {
+             return prev.filter(b => !dragChainIds.includes(b.id));
+           } else {
+             const clampedX = Math.max(0, Math.min(target.x, canvas.width - target.width));
+             const clampedY = Math.max(0, Math.min(target.y, canvas.height - target.height));
+             const dx = clampedX - target.x;
+             const dy = clampedY - target.y;
+             return prev.map(b => dragChainIds.includes(b.id) ? { ...b, isDragging: false, x: b.x + dx, y: b.y + dy } : b);
+           }
         }
 
         let newBlocks = prev.map(b => dragChainIds.includes(b.id) ? { ...b, isDragging: false } : b);
         const updatedTarget = newBlocks.find(b => b.id === targetId)!;
 
         if (updatedTarget.type !== 'event') {
-          for (const other of newBlocks) {
-            if (!dragChainIds.includes(other.id)) {
-              const snapX = other.x;
-              const snapY = other.y + other.height;
-              const hasChild = newBlocks.some(b => b.connectedTo === other.id && !dragChainIds.includes(b.id));
-              if (!hasChild && Math.abs(updatedTarget.x - snapX) < 100 && Math.abs(updatedTarget.y - snapY) < 80) {
-                const dx = snapX - updatedTarget.x;
-                const dy = snapY - updatedTarget.y;
-                newBlocks = newBlocks.map(b => dragChainIds.includes(b.id) ? { ...b, x: b.x + dx, y: b.y + dy, connectedTo: b.id === targetId ? other.id : b.connectedTo } : b);
-                break;
-              }
+          let bestTarget = null;
+          let minDistance = 40; // Reasonable snap distance
+
+          const validTargets = newBlocks.filter(b => 
+            !dragChainIds.includes(b.id) && 
+            !newBlocks.some(child => child.connectedTo === b.id && !dragChainIds.includes(child.id))
+          );
+
+          for (const t of validTargets) {
+            const snapX = t.x;
+            const snapY = t.y + t.height;
+            const dist = Math.hypot(updatedTarget.x - snapX, updatedTarget.y - snapY);
+
+            if (dist < minDistance) {
+              minDistance = dist;
+              bestTarget = t;
             }
+          }
+
+          if (bestTarget) {
+            const snapX = bestTarget.x;
+            const snapY = bestTarget.y + bestTarget.height;
+            const dx = snapX - updatedTarget.x;
+            const dy = snapY - updatedTarget.y;
+            newBlocks = newBlocks.map(b => dragChainIds.includes(b.id) ? { 
+              ...b, 
+              x: b.x + dx, 
+              y: b.y + dy, 
+              connectedTo: b.id === targetId ? bestTarget.id : b.connectedTo 
+            } : b);
           }
         }
         return newBlocks;
