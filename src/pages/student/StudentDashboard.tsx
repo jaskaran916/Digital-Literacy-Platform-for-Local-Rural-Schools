@@ -3,10 +3,12 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, User } from '../../db/db';
 import { Shield, Code, Star, LogOut, Award } from 'lucide-react';
+import AchievementBadgesModal from '../../components/student/AchievementBadgesModal';
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
+  const [isBadgesModalOpen, setIsBadgesModalOpen] = useState(false);
   const modules = useLiveQuery(() => db.modules.toArray());
   const progress = useLiveQuery(() => db.userProgress.where('user_id').equals(user?.id || 0).toArray(), [user]);
 
@@ -57,7 +59,10 @@ export default function StudentDashboard() {
           </div>
           
           <div className="flex gap-4">
-            <button className="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-700 font-semibold rounded-2xl hover:bg-indigo-100 transition-colors">
+            <button 
+              onClick={() => setIsBadgesModalOpen(true)}
+              className="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-700 font-semibold rounded-2xl hover:bg-indigo-100 transition-colors"
+            >
               <Award size={20} />
               Badges
             </button>
@@ -108,6 +113,12 @@ export default function StudentDashboard() {
         </div>
 
       </div>
+      
+      <AchievementBadgesModal 
+        isOpen={isBadgesModalOpen} 
+        onClose={() => setIsBadgesModalOpen(false)} 
+        userId={user.id!} 
+      />
     </div>
   );
 }
