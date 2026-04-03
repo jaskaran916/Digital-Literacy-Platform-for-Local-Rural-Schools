@@ -176,6 +176,7 @@ export default function LearningEnvironment() {
             type="pre" 
             moduleType={module.type} 
             onComplete={handlePreTestComplete} 
+            videoUrl={module.video_url}
           />
         )}
 
@@ -233,6 +234,7 @@ export default function LearningEnvironment() {
             type="post" 
             moduleType={module.type} 
             onComplete={handlePostTestComplete} 
+            videoUrl={module.video_url}
           />
         )}
 
