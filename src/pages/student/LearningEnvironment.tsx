@@ -209,16 +209,14 @@ export default function LearningEnvironment() {
                     </>
                   )}
                 </div>
-                {module.video_url && (
-                  <a 
-                    href={module.video_url.replace('/embed/', '/watch?v=')} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-indigo-400 hover:text-indigo-300 underline text-sm"
-                  >
-                    Watch on YouTube
-                  </a>
-                )}
+                <a 
+                  href={(module.video_url || 'https://www.youtube.com/embed/dQw4w9WgXcQ').replace('/embed/', '/watch?v=')} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="text-indigo-400 hover:text-indigo-300 underline text-sm font-medium"
+                >
+                  Watch on YouTube
+                </a>
                 <button 
                   onClick={handleLearningComplete}
                   className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 text-white text-xl font-bold rounded-2xl transition-colors shadow-lg shadow-emerald-500/20"
