@@ -1,0 +1,79 @@
+import { X, Award, Star, Shield, Code, Zap, Trophy } from 'lucide-react';
+import { db } from '../../db/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+
+export const BADGES = [
+  { id: 'first_steps', title: 'First Steps', description: 'Completed your first module', icon: Star, color: 'text-yellow-500', bg: 'bg-yellow-500/20' },
+  { id: 'coding_novice', title: 'Coding Novice', description: 'Completed 3 coding modules', icon: Code, color: 'text-blue-500', bg: 'bg-blue-500/20' },
+  { id: 'safety_novice', title: 'Safety Novice', description: 'Completed 3 safety modules', icon: Shield, color: 'text-rose-500', bg: 'bg-rose-500/20' },
+  { id: 'perfect_score', title: 'Perfect Score', description: 'Got 100% on a post-test', icon: Trophy, color: 'text-emerald-500', bg: 'bg-emerald-500/20' },
+  { id: 'fast_learner', title: 'Fast Learner', description: 'Reached Level 5', icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/20' },
+];
+
+interface AchievementBadgesModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  userId: number;
+}
+
+export default function AchievementBadgesModal({ isOpen, onClose, userId }: AchievementBadgesModalProps) {
+  const earnedBadges = useLiveQuery(() => db.earnedBadges.where('user_id').equals(userId).toArray(), [userId]);
+
+  if (!isOpen) return null;
+
+  const earnedBadgeIds = earnedBadges?.map(b => b.badge_id) || [];
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-slate-800 border border-slate-700 rounded-3xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-900/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-500/20 rounded-xl flex items-center justify-center text-amber-400">
+              <Award size={20} />
+            </div>
+            <h2 className="text-xl font-bold text-white">Your Achievements</h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-lg transition-colors"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {BADGES.map(badge => {
+              const isEarned = earnedBadgeIds.includes(badge.id);
+              const Icon = badge.icon;
+              
+              return (
+                <div 
+                  key={badge.id} 
+                  className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center text-center gap-4 ${
+                    isEarned 
+                      ? 'bg-slate-800 border-slate-600 shadow-lg' 
+                      : 'bg-slate-800/50 border-slate-700/50 opacity-50 grayscale'
+                  }`}
+                >
+                  <div className={`w-20 h-20 rounded-full flex items-center justify-center ${isEarned ? badge.bg : 'bg-slate-700'}`}>
+                    <Icon size={40} className={isEarned ? badge.color : 'text-slate-500'} />
+                  </div>
+                  <div>
+                    <h3 className={`text-lg font-bold ${isEarned ? 'text-white' : 'text-slate-400'}`}>{badge.title}</h3>
+                    <p className="text-sm text-slate-400 mt-1">{badge.description}</p>
+                  </div>
+                  {isEarned && (
+                    <div className="mt-auto pt-4 w-full border-t border-slate-700">
+                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Unlocked</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
