@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../../db/db';
-import { UserPlus, User as UserIcon } from 'lucide-react';
+import { db, User } from '../../db/db';
+import { UserPlus, User as UserIcon, Lock } from 'lucide-react';
 
 export default function StudentAuth() {
   const users = useLiveQuery(() => db.users.toArray());
@@ -10,6 +10,9 @@ export default function StudentAuth() {
   const [isCreating, setIsCreating] = useState(false);
   const [newName, setNewName] = useState('');
   const [newPin, setNewPin] = useState('');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [loginPin, setLoginPin] = useState('');
+  const [loginError, setLoginError] = useState('');
 
   const handleLogin = (userId: number) => {
     localStorage.setItem('currentUserId', userId.toString());
@@ -31,14 +34,74 @@ export default function StudentAuth() {
     handleLogin(id);
   };
 
+  const handlePinSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedUser?.pin === loginPin) {
+      handleLogin(selectedUser.id!);
+    } else {
+      setLoginError('Incorrect PIN');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-sm border border-slate-100 p-8 md:p-12">
         <h1 className="text-3xl md:text-4xl font-bold text-slate-900 text-center mb-12">
-          Who is playing today?
+          {selectedUser ? `Welcome back, ${selectedUser.name}!` : 'Who is playing today?'}
         </h1>
 
-        {isCreating ? (
+        {selectedUser ? (
+          <form onSubmit={handlePinSubmit} className="max-w-md mx-auto space-y-6">
+            <div className="flex flex-col items-center mb-8">
+              <img 
+                src={selectedUser.avatar} 
+                alt={selectedUser.name} 
+                className="w-32 h-32 rounded-full bg-slate-100 shadow-sm mb-4"
+              />
+            </div>
+            <div>
+              <label className="block text-lg font-medium text-slate-700 mb-2 text-center">Enter your Secret PIN</label>
+              <input 
+                type="password" 
+                maxLength={4}
+                value={loginPin}
+                onChange={(e) => {
+                  setLoginPin(e.target.value.replace(/[^0-9]/g, ''));
+                  setLoginError('');
+                }}
+                className={`w-full text-3xl tracking-widest text-center p-4 border-2 rounded-2xl outline-none transition-colors ${
+                  loginError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500'
+                }`}
+                placeholder="****"
+                required
+                autoFocus
+              />
+              {loginError && (
+                <p className="text-rose-500 text-center mt-2 font-medium">{loginError}</p>
+              )}
+            </div>
+            <div className="flex gap-4 pt-4">
+              <button 
+                type="button"
+                onClick={() => {
+                  setSelectedUser(null);
+                  setLoginPin('');
+                  setLoginError('');
+                }}
+                className="flex-1 py-4 text-lg font-medium text-slate-600 bg-slate-100 rounded-2xl hover:bg-slate-200 transition-colors"
+              >
+                Back
+              </button>
+              <button 
+                type="submit"
+                className="flex-1 py-4 text-lg font-medium text-white bg-emerald-500 rounded-2xl hover:bg-emerald-600 transition-colors flex items-center justify-center gap-2"
+              >
+                <Lock size={20} />
+                Unlock
+              </button>
+            </div>
+          </form>
+        ) : isCreating ? (
           <form onSubmit={handleCreate} className="max-w-md mx-auto space-y-6">
             <div>
               <label className="block text-lg font-medium text-slate-700 mb-2">Your Name</label>
@@ -84,7 +147,7 @@ export default function StudentAuth() {
             {users?.map(user => (
               <button
                 key={user.id}
-                onClick={() => handleLogin(user.id!)}
+                onClick={() => setSelectedUser(user)}
                 className="group flex flex-col items-center p-6 bg-slate-50 rounded-3xl hover:bg-emerald-50 hover:ring-2 ring-emerald-500 transition-all"
               >
                 <img 
