@@ -89,9 +89,10 @@ interface QuizEngineProps {
   type: 'pre' | 'post';
   moduleType: 'coding' | 'safety';
   onComplete: (score: number) => void;
+  videoUrl?: string;
 }
 
-export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineProps) {
+export default function QuizEngine({ type, moduleType, onComplete, videoUrl }: QuizEngineProps) {
   const questions = moduleType === 'coding' ? codingQuestions : safetyQuestions;
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<(number | null)[]>(new Array(questions.length).fill(null));
@@ -166,10 +167,22 @@ export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineP
           />
         </div>
 
-        <div className="mb-8 text-center">
-          <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-500/20 text-indigo-400 font-semibold text-sm mb-6 uppercase tracking-wider">
-            {type === 'pre' ? 'Pre-Test Challenge' : 'Post-Test Challenge'}
-          </span>
+        <div className="mb-8 text-center relative">
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-6">
+            <span className="inline-block px-4 py-1.5 rounded-full bg-indigo-500/20 text-indigo-400 font-semibold text-sm uppercase tracking-wider">
+              {type === 'pre' ? 'Pre-Test Challenge' : 'Post-Test Challenge'}
+            </span>
+            {videoUrl && (
+              <a 
+                href={(videoUrl || 'https://www.youtube.com/embed/dQw4w9WgXcQ').replace('/embed/', '/watch?v=')} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 font-semibold text-sm transition-colors"
+              >
+                Watch on YouTube
+              </a>
+            )}
+          </div>
           <h2 className="text-2xl md:text-3xl font-bold text-white leading-tight">
             {currentQuestion.text}
           </h2>
