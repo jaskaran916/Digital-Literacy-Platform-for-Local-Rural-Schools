@@ -89,6 +89,46 @@ export default function LearningEnvironment() {
     
     await db.users.update(user.id!, { xp: newXp, level: newLevel });
     
+    // Check and award badges
+    const earnedBadges = await db.earnedBadges.where('user_id').equals(user.id!).toArray();
+    const earnedBadgeIds = earnedBadges.map(b => b.badge_id);
+    
+    const newBadges: string[] = [];
+
+    if (!earnedBadgeIds.includes('first_steps')) {
+      newBadges.push('first_steps');
+    }
+
+    if (score === 100 && !earnedBadgeIds.includes('perfect_score')) {
+      newBadges.push('perfect_score');
+    }
+
+    if (newLevel >= 5 && !earnedBadgeIds.includes('fast_learner')) {
+      newBadges.push('fast_learner');
+    }
+
+    const allProgress = await db.userProgress.where('user_id').equals(user.id!).toArray();
+    const completedModules = allProgress.filter(p => p.status === 'done' || p.module_id === module.id).map(p => p.module_id);
+    
+    const allModules = await db.modules.toArray();
+    const completedCoding = allModules.filter(m => m.type === 'coding' && completedModules.includes(m.id)).length;
+    const completedSafety = allModules.filter(m => m.type === 'safety' && completedModules.includes(m.id)).length;
+
+    if (completedCoding >= 3 && !earnedBadgeIds.includes('coding_novice')) {
+      newBadges.push('coding_novice');
+    }
+    if (completedSafety >= 3 && !earnedBadgeIds.includes('safety_novice')) {
+      newBadges.push('safety_novice');
+    }
+
+    for (const badgeId of newBadges) {
+      await db.earnedBadges.add({
+        user_id: user.id!,
+        badge_id: badgeId,
+        awarded_at: Date.now()
+      });
+    }
+    
     // Queue sync
     await db.syncQueue.add({
       action: 'module_completed',
