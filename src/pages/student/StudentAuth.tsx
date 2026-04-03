@@ -36,7 +36,8 @@ export default function StudentAuth() {
 
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedUser?.pin === loginPin) {
+    // Allow login if user has no PIN (legacy) or if PIN matches
+    if (!selectedUser?.pin || selectedUser.pin === loginPin) {
       handleLogin(selectedUser.id!);
     } else {
       setLoginError('Incorrect PIN');
@@ -64,6 +65,8 @@ export default function StudentAuth() {
               <input 
                 type="password" 
                 maxLength={4}
+                minLength={4}
+                pattern="\d{4}"
                 value={loginPin}
                 onChange={(e) => {
                   setLoginPin(e.target.value.replace(/[^0-9]/g, ''));
@@ -73,7 +76,7 @@ export default function StudentAuth() {
                   loginError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500' : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500'
                 }`}
                 placeholder="****"
-                required
+                required={!!selectedUser.pin}
                 autoFocus
               />
               {loginError && (
@@ -119,6 +122,8 @@ export default function StudentAuth() {
               <input 
                 type="password" 
                 maxLength={4}
+                minLength={4}
+                pattern="\d{4}"
                 value={newPin}
                 onChange={(e) => setNewPin(e.target.value.replace(/[^0-9]/g, ''))}
                 className="w-full text-2xl tracking-widest text-center p-4 border-2 border-slate-200 rounded-2xl focus:border-emerald-500 focus:ring-emerald-500 outline-none transition-colors"
