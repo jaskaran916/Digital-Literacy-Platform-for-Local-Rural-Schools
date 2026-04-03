@@ -259,28 +259,41 @@ export default function QuizEngine({ type, moduleType, onComplete, videoUrl }: Q
           </button>
           
           <div className="flex items-center gap-2 sm:gap-3">
-            {questions.map((_, idx) => (
-              <label key={idx} className="cursor-pointer flex items-center justify-center" aria-label={`Go to question ${idx + 1}`}>
-                <input
-                  type="radio"
-                  name="quiz-progress"
-                  className="sr-only"
-                  checked={currentIndex === idx}
-                  onChange={() => setCurrentIndex(idx)}
-                />
-                <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 flex items-center justify-center transition-all ${
-                  currentIndex === idx 
-                    ? 'border-emerald-500' 
-                    : checked[idx] 
-                      ? 'border-indigo-500 bg-indigo-500/20' 
-                      : 'border-slate-600 bg-slate-800'
-                }`}>
-                  {currentIndex === idx && (
-                    <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-emerald-500 rounded-full" />
-                  )}
-                </div>
-              </label>
-            ))}
+            {questions.map((_, idx) => {
+              const isAnswered = checked[idx];
+              const isCorrect = answers[idx] === questions[idx].correctIndex;
+              
+              let circleClass = 'border-slate-600 bg-slate-800';
+              if (currentIndex === idx) {
+                circleClass = 'border-emerald-500';
+              } else if (isAnswered) {
+                circleClass = isCorrect ? 'border-emerald-500 bg-emerald-500/20' : 'border-rose-500 bg-rose-500/20';
+              }
+
+              let dotClass = '';
+              if (currentIndex === idx) {
+                dotClass = 'bg-emerald-500';
+              } else if (isAnswered) {
+                dotClass = isCorrect ? 'bg-emerald-500' : 'bg-rose-500';
+              }
+
+              return (
+                <label key={idx} className="cursor-pointer flex items-center justify-center" aria-label={`Go to question ${idx + 1}`}>
+                  <input
+                    type="radio"
+                    name="quiz-progress"
+                    className="sr-only"
+                    checked={currentIndex === idx}
+                    onChange={() => setCurrentIndex(idx)}
+                  />
+                  <div className={`w-3 h-3 sm:w-4 sm:h-4 rounded-full border-2 flex items-center justify-center transition-all ${circleClass}`}>
+                    {(currentIndex === idx || isAnswered) && (
+                      <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full ${dotClass}`} />
+                    )}
+                  </div>
+                </label>
+              );
+            })}
           </div>
 
           {!isCurrentChecked ? (
