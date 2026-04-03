@@ -131,6 +131,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(canvas.width, i); ctx.stroke();
     }
 
+    // 1. Draw shadows, bodies, and cutouts
     workspaceBlocks.forEach(b => {
       ctx.save();
       // Shadow
@@ -158,11 +159,6 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
         ctx.fill();
       }
 
-      ctx.beginPath();
-      ctx.arc(b.x + 30, b.y + b.height, 12, 0, Math.PI, false);
-      ctx.fillStyle = b.color;
-      ctx.fill();
-
       ctx.fillStyle = '#ffffff';
       ctx.font = 'bold 16px Inter, sans-serif';
       ctx.textAlign = 'center';
@@ -172,6 +168,24 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       if (b.isDragging) {
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+      ctx.restore();
+    });
+
+    // 2. Draw bottom tabs so they overlap the cutouts of connected blocks
+    workspaceBlocks.forEach(b => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(b.x + 30, b.y + b.height, 12, 0, Math.PI, false);
+      ctx.fillStyle = b.color;
+      ctx.fill();
+      
+      if (b.isExecuting) {
+        ctx.strokeStyle = '#fbbf24';
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(b.x + 30, b.y + b.height, 12, 0, Math.PI, false);
         ctx.stroke();
       }
       ctx.restore();
@@ -190,7 +204,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       );
 
       let bestTarget = null;
-      let minDistance = 40;
+      let minDistance = 80;
 
       for (const target of validTargets) {
         const snapX = target.x;
@@ -301,7 +315,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
 
         if (updatedTarget.type !== 'event') {
           let bestTarget = null;
-          let minDistance = 40; // Reasonable snap distance
+          let minDistance = 80; // Reasonable snap distance
 
           const validTargets = newBlocks.filter(b => 
             !dragChainIds.includes(b.id) && 
@@ -348,8 +362,10 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
     };
   }, [getChain]);
 
-  const handleRun = async () => {
-    if (isPlaying) return;
+  const [lastSequence, setLastSequence] = useState<string>('');
+
+  const handleRun = useCallback(async (blocksToRun?: WorkspaceBlock[]) => {
+    const blocks = blocksToRun || workspaceBlocksRef.current;
     setIsPlaying(true);
     setError(null);
     setShowSuccess(false);
@@ -363,7 +379,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       const sequence: { id: string, text: string }[] = [];
       let currentId: string | null = 'start';
       while (currentId) {
-        const next = workspaceBlocks.find(b => b.connectedTo === currentId);
+        const next = blocks.find(b => b.connectedTo === currentId);
         if (next) {
           sequence.push({ id: next.id, text: next.text });
           currentId = next.id;
@@ -373,7 +389,9 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
       }
 
       if (sequence.length === 0) {
-        setError("Drag blocks from the Toolbox and connect them under 'When Run'!");
+        if (!blocksToRun) {
+          setError("Drag blocks from the Toolbox and connect them under 'When Run'!");
+        }
         return;
       }
 
@@ -436,7 +454,39 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
         setIsPlaying(false);
       }
     }
-  };
+  }, [level]);
+
+  useEffect(() => {
+    const isDragging = workspaceBlocks.some(b => b.isDragging);
+    if (isDragging) return;
+
+    const sequence: string[] = [];
+    let currentId: string | null = 'start';
+    while (currentId) {
+      const next = workspaceBlocks.find(b => b.connectedTo === currentId);
+      if (next) {
+        sequence.push(next.id);
+        currentId = next.id;
+      } else {
+        currentId = null;
+      }
+    }
+    
+    const seqStr = sequence.join(',');
+    if (seqStr !== lastSequence) {
+      setLastSequence(seqStr);
+      if (sequence.length > 0) {
+        handleRun(workspaceBlocks);
+      } else {
+        runIdRef.current++;
+        setRobotPos({ ...level.start, dir: 0 });
+        setIsPlaying(false);
+        setShowSuccess(false);
+        setError(null);
+        setWorkspaceBlocks(prev => prev.map(b => ({ ...b, isExecuting: false })));
+      }
+    }
+  }, [workspaceBlocks, lastSequence, handleRun, level.start]);
 
   const handleReset = () => {
     runIdRef.current++;
@@ -483,7 +533,7 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
           <h3 className="font-semibold text-slate-300">Simulation</h3>
           <div className="flex gap-2">
             <button onClick={handleReset} className="p-2 bg-slate-700 hover:bg-slate-600 rounded-lg text-slate-300 transition-colors"><RotateCcw size={18} /></button>
-            <button onClick={handleRun} disabled={isPlaying} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"><Play size={18} />Run</button>
+            <button onClick={() => handleRun()} disabled={isPlaying} className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white font-bold rounded-lg flex items-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"><Play size={18} />Run</button>
           </div>
         </div>
         
