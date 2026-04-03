@@ -207,8 +207,29 @@ export default function QuizEngine({ type, moduleType, onComplete }: QuizEngineP
             <ArrowLeft size={20} /> Move Backward
           </button>
           
-          <div className="text-slate-400 font-medium">
-            {currentIndex + 1} / {questions.length}
+          <div className="flex items-center gap-3">
+            {questions.map((_, idx) => (
+              <label key={idx} className="cursor-pointer flex items-center justify-center" aria-label={`Go to question ${idx + 1}`}>
+                <input
+                  type="radio"
+                  name="quiz-progress"
+                  className="sr-only"
+                  checked={currentIndex === idx}
+                  onChange={() => setCurrentIndex(idx)}
+                />
+                <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center transition-all ${
+                  currentIndex === idx 
+                    ? 'border-emerald-500' 
+                    : answers[idx] !== null 
+                      ? 'border-indigo-500 bg-indigo-500/20' 
+                      : 'border-slate-600 bg-slate-800'
+                }`}>
+                  {currentIndex === idx && (
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                  )}
+                </div>
+              </label>
+            ))}
           </div>
 
           {currentIndex < questions.length - 1 ? (
