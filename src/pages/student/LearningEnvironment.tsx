@@ -189,7 +189,7 @@ export default function LearningEnvironment() {
                   {isPlayingVideo ? (
                     <iframe 
                       className="w-full h-full absolute inset-0 z-30"
-                      src={`https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1`} 
+                      src={`${module.video_url || 'https://www.youtube.com/embed/dQw4w9WgXcQ'}?autoplay=1`} 
                       title="Video Lesson" 
                       allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
                       allowFullScreen
