@@ -155,17 +155,6 @@ export default function LearningEnvironment() {
         </div>
         
         <div className="flex items-center gap-4">
-          {module.video_url && (
-            <a
-              href={(module.video_url || 'https://www.youtube.com/embed/dQw4w9WgXcQ').replace('/embed/', '/watch?v=')}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 px-4 py-2 rounded-xl text-sm font-bold transition-colors border border-rose-500/30"
-            >
-              <Video size={18} />
-              <span className="hidden sm:inline">Watch on YouTube</span>
-            </a>
-          )}
           <div className="flex items-center gap-2 bg-slate-700 px-4 py-2 rounded-full text-sm font-medium">
             <span className="text-slate-400">Stage:</span>
             <span className="text-emerald-400 capitalize">{stage.replace('-', ' ')}</span>
