@@ -636,9 +636,13 @@ export default function CanvasCodeEditor({ onComplete }: { onComplete: () => voi
             <Trophy size={48} className="text-white" />
           </div>
           <h2 className="text-4xl font-bold text-white mb-4">Mission Accomplished!</h2>
-          <p className="text-xl text-slate-400 mb-8 max-w-md">
+          <p className="text-xl text-slate-400 mb-6 max-w-md">
             Great job! You navigated the robot to the target using your code.
           </p>
+          <div className="bg-emerald-500/20 border border-emerald-500/50 rounded-2xl px-6 py-3 mb-8 flex items-center gap-3">
+            <span className="text-2xl font-bold text-emerald-400">+50 XP</span>
+            <span className="text-emerald-400/80 font-medium">Level Completed!</span>
+          </div>
           <button
             onClick={onComplete}
             className="px-10 py-4 bg-emerald-500 hover:bg-emerald-600 text-white text-xl font-bold rounded-2xl transition-all shadow-lg shadow-emerald-500/20 active:scale-95"
