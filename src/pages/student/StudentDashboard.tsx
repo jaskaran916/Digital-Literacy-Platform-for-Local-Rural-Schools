@@ -36,6 +36,13 @@ export default function StudentDashboard() {
     return p?.status === 'done' ? 100 : p?.status === 'in-progress' ? 50 : 0;
   };
 
+  const getProgressStatus = (moduleId: string) => {
+    const p = progress?.find(p => p.module_id === moduleId);
+    if (p?.status === 'done') return 'Completed';
+    if (p?.status === 'in-progress') return 'In Progress';
+    return 'Not Started';
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8">
       <div className="max-w-6xl mx-auto space-y-8">
@@ -95,13 +102,23 @@ export default function StudentDashboard() {
                   <p className="text-slate-500 flex-grow">{mod.description}</p>
                   
                   <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex justify-between text-sm font-medium mb-2">
+                    <div className="flex justify-between items-center text-sm font-medium mb-3">
                       <span className="text-slate-500">Progress</span>
-                      <span className={percent === 100 ? 'text-emerald-500' : 'text-slate-700'}>{percent}%</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        percent === 100 
+                          ? 'bg-emerald-100 text-emerald-700' 
+                          : percent === 50 
+                            ? 'bg-amber-100 text-amber-700' 
+                            : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        {getProgressStatus(mod.id)}
+                      </span>
                     </div>
                     <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full rounded-full transition-all duration-500 ${percent === 100 ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          percent === 100 ? 'bg-emerald-500' : percent === 50 ? 'bg-amber-400' : 'bg-slate-300'
+                        }`}
                         style={{ width: `${percent}%` }}
                       />
                     </div>
