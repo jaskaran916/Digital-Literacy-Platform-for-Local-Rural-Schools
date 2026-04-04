@@ -8,6 +8,9 @@ export const BADGES = [
   { id: 'safety_novice', title: 'Safety Novice', description: 'Completed 3 safety modules', icon: Shield, color: 'text-rose-500', bg: 'bg-rose-500/20' },
   { id: 'perfect_score', title: 'Perfect Score', description: 'Got 100% on a post-test', icon: Trophy, color: 'text-emerald-500', bg: 'bg-emerald-500/20' },
   { id: 'fast_learner', title: 'Fast Learner', description: 'Reached Level 5', icon: Zap, color: 'text-purple-500', bg: 'bg-purple-500/20' },
+  { id: 'coding_master', title: 'Coding Master', description: 'Completed all coding modules', icon: Code, color: 'text-indigo-500', bg: 'bg-indigo-500/20' },
+  { id: 'safety_master', title: 'Safety Master', description: 'Completed all safety modules', icon: Shield, color: 'text-pink-500', bg: 'bg-pink-500/20' },
+  { id: 'perfectionist', title: 'Perfectionist', description: 'Got 100% on 3 post-tests', icon: Trophy, color: 'text-amber-500', bg: 'bg-amber-500/20' },
 ];
 
 interface AchievementBadgesModalProps {
