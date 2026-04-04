@@ -28,9 +28,9 @@ const LEARNING_RESOURCES = [
     color: "bg-emerald-100 text-emerald-600"
   },
   {
-    title: "Be Internet Awesome",
-    channel: "Google",
-    url: "https://www.youtube.com/watch?v=M-1B-X09A0M",
+    title: "Cybersecurity & Crime",
+    channel: "Code.org",
+    url: "https://www.youtube.com/watch?v=zALlsJgE9D0",
     icon: Shield,
     color: "bg-rose-100 text-rose-600"
   }
