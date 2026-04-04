@@ -67,7 +67,17 @@ export default function LearningEnvironment() {
     setStage('learning');
   };
 
-  const handleLearningComplete = () => {
+  const handleLearningComplete = async () => {
+    if (!user) return;
+    
+    // Award XP for completing the coding/learning level
+    const xpGained = 50;
+    const newXp = user.xp + xpGained;
+    const newLevel = Math.floor(newXp / 100) + 1;
+    
+    await db.users.update(user.id!, { xp: newXp, level: newLevel });
+    setUser({ ...user, xp: newXp, level: newLevel });
+    
     setStage('post-test');
   };
 
@@ -111,6 +121,9 @@ export default function LearningEnvironment() {
     const completedModules = allProgress.filter(p => p.status === 'done' || p.module_id === module.id).map(p => p.module_id);
     
     const allModules = await db.modules.toArray();
+    const totalCoding = allModules.filter(m => m.type === 'coding').length;
+    const totalSafety = allModules.filter(m => m.type === 'safety').length;
+    
     const completedCoding = allModules.filter(m => m.type === 'coding' && completedModules.includes(m.id)).length;
     const completedSafety = allModules.filter(m => m.type === 'safety' && completedModules.includes(m.id)).length;
 
@@ -119,6 +132,21 @@ export default function LearningEnvironment() {
     }
     if (completedSafety >= 3 && !earnedBadgeIds.includes('safety_novice')) {
       newBadges.push('safety_novice');
+    }
+    
+    if (completedCoding === totalCoding && totalCoding > 0 && !earnedBadgeIds.includes('coding_master')) {
+      newBadges.push('coding_master');
+    }
+    if (completedSafety === totalSafety && totalSafety > 0 && !earnedBadgeIds.includes('safety_master')) {
+      newBadges.push('safety_master');
+    }
+
+    const allAssessments = await db.assessments.where('user_id').equals(user.id!).toArray();
+    // Include the current score in the count if it's 100
+    const perfectScoresCount = allAssessments.filter(a => a.post_score === 100).length + (score === 100 && (!record || record.post_score !== 100) ? 1 : 0);
+    
+    if (perfectScoresCount >= 3 && !earnedBadgeIds.includes('perfectionist')) {
+      newBadges.push('perfectionist');
     }
 
     for (const badgeId of newBadges) {
