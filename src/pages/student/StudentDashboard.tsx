@@ -22,15 +22,15 @@ const LEARNING_RESOURCES = [
   },
   {
     title: "What is Coding?",
-    channel: "GCFGlobal",
-    url: "https://www.youtube.com/watch?v=cMEqmDqUziQ",
+    channel: "Code.org",
+    url: "https://www.youtube.com/watch?v=jBzwzrDvZ18",
     icon: Code,
     color: "bg-emerald-100 text-emerald-600"
   },
   {
-    title: "Internet Safe and Secure",
-    channel: "Code.org",
-    url: "https://www.youtube.com/watch?v=AuZNKAJACpQ",
+    title: "Be Internet Awesome",
+    channel: "Google",
+    url: "https://www.youtube.com/watch?v=M-1B-X09A0M",
     icon: Shield,
     color: "bg-rose-100 text-rose-600"
   }
