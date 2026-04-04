@@ -2,8 +2,39 @@ import { useEffect, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, User } from '../../db/db';
-import { Shield, Code, Star, LogOut, Award } from 'lucide-react';
+import { Shield, Code, Star, LogOut, Award, MonitorPlay, Cpu, Video, PlayCircle } from 'lucide-react';
 import AchievementBadgesModal from '../../components/student/AchievementBadgesModal';
+
+const LEARNING_RESOURCES = [
+  {
+    title: "How Computers Work",
+    channel: "Code.org",
+    url: "https://www.youtube.com/watch?v=OAx_6-wdslM",
+    icon: MonitorPlay,
+    color: "bg-blue-100 text-blue-600"
+  },
+  {
+    title: "Crash Course Computer Science",
+    channel: "CrashCourse",
+    url: "https://www.youtube.com/watch?v=tpIctyqH29Q",
+    icon: Cpu,
+    color: "bg-purple-100 text-purple-600"
+  },
+  {
+    title: "What is Coding?",
+    channel: "GCFGlobal",
+    url: "https://www.youtube.com/watch?v=cMEqmDqUziQ",
+    icon: Code,
+    color: "bg-emerald-100 text-emerald-600"
+  },
+  {
+    title: "Internet Safe and Secure",
+    channel: "Code.org",
+    url: "https://www.youtube.com/watch?v=AuZNKAJACpQ",
+    icon: Shield,
+    color: "bg-rose-100 text-rose-600"
+  }
+];
 
 export default function StudentDashboard() {
   const navigate = useNavigate();
@@ -124,6 +155,34 @@ export default function StudentDashboard() {
                     </div>
                   </div>
                 </Link>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Learning Resources */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+            <PlayCircle className="text-rose-500" />
+            Learning Resources
+          </h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {LEARNING_RESOURCES.map((resource, idx) => {
+              const Icon = resource.icon;
+              return (
+                <a 
+                  key={idx}
+                  href={resource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:shadow-md hover:border-rose-200 transition-all flex flex-col items-start"
+                >
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-4 ${resource.color}`}>
+                    <Icon size={24} />
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-1 group-hover:text-rose-600 transition-colors line-clamp-2">{resource.title}</h3>
+                  <p className="text-sm font-medium text-slate-500">{resource.channel}</p>
+                </a>
               );
             })}
           </div>
